@@ -1,6 +1,7 @@
 # Heart Attack Risk Prediction
 
-Проект предсказывает риск сердечного приступа по данным пациента.  
+Проект предсказывает риск сердечного приступа по данным пациента.
+
 Приложение реализовано на **FastAPI**: принимает путь к CSV-файлу, выполняет предсказание и возвращает результат в JSON.
 
 ---
@@ -43,16 +44,11 @@ heart_attacks/
 
 ## Установка
 
-Создайте виртуальное окружение:
+Проект рекомендуется запускать через conda-окружение `ds`.
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-Установите зависимости:
-
-```bash
+conda create -n ds python=3.12
+conda activate ds
 pip install -r requirements.txt
 ```
 
@@ -61,15 +57,27 @@ pip install -r requirements.txt
 ```text
 pandas
 numpy
-scikit-learn==1.6.1
+scipy
+scikit-learn==1.8.0
 fastapi
 uvicorn
 pydantic
 joblib
 requests
+matplotlib
+seaborn
+jupyterlab
+notebook
+ipykernel
 ```
 
-Важно: версия `scikit-learn` должна совпадать с версией, в которой была сохранена модель `final_model.joblib`.
+Важно: модель `models/final_model.joblib` сохранена в окружении со `scikit-learn==1.8.0`.
+
+Проверить версию:
+
+```bash
+python -c "import sklearn; print(sklearn.__version__)"
+```
 
 ---
 
@@ -81,7 +89,7 @@ requests
 models/final_model.joblib
 ```
 
-Если модель сохраняется из ноутбука, расположенного в папке `notebooks/`, используйте путь:
+Если модель сохраняется из ноутбука в папке `notebooks/`, используйте путь:
 
 ```python
 final_model = FinalModel(
@@ -93,6 +101,8 @@ final_model.fit(X, y)
 final_model.save()
 ```
 
+Если версия `scikit-learn` была изменена, модель нужно заново обучить и сохранить в том же окружении.
+
 ---
 
 ## Запуск API
@@ -100,6 +110,7 @@ final_model.save()
 Из корня проекта:
 
 ```bash
+conda activate ds
 python -m uvicorn app.main:app --reload
 ```
 
@@ -119,7 +130,7 @@ http://127.0.0.1:8000/docs
 
 ## Запрос к API
 
-В Swagger откройте метод:
+В Swagger откройте:
 
 ```text
 POST /predict
@@ -172,6 +183,7 @@ scripts/test_api.py
 Запуск:
 
 ```bash
+conda activate ds
 python scripts/test_api.py
 ```
 
@@ -203,7 +215,7 @@ print(response.json())
 data/predictions/submission.csv
 ```
 
-Формат:
+Формат файла:
 
 ```csv
 ,id,prediction
@@ -224,6 +236,13 @@ submission.to_csv("data/predictions/submission.csv", index=True)
 pd.read_csv(args.student, index_col=0)
 ```
 
+После чтения должны остаться две колонки:
+
+```text
+id
+prediction
+```
+
 ---
 
 ## Проверка качества модели
@@ -237,6 +256,7 @@ scripts/test.py
 Запуск:
 
 ```bash
+conda activate ds
 python scripts/test.py --student data/predictions/submission.csv --correct correct_answers.csv
 ```
 
@@ -248,45 +268,85 @@ python scripts/test.py --student data/predictions/submission.csv --correct corre
 
 Основная метрика для сравнения моделей — `macro avg f1-score`.
 
+Если файла `correct_answers.csv` нет, локально можно проверить только формат `submission.csv`.
+
+---
+
+## Основные классы
+
+`DataProcessor` — подготовка данных: переименование колонок, обработка `gender`, удаление технических колонок.
+
+`HeartAttackPredictor` — загрузка модели, чтение CSV, предобработка, предсказание и возврат результата.
+
+---
+
+## Краткий порядок запуска
+
+```bash
+conda activate ds
+cd "../heart_attacks"
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
+```
+
+Далее откройте:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+и выполните запрос к методу:
+
+```text
+POST /predict
+```
+
+с телом:
+
+```json
+{
+  "file_path": "data/raw/heart_test.csv"
+}
+```
+
 ---
 
 ## Частые ошибки
 
+### `Method Not Allowed`
+
+Ошибка появляется, если открыть `/predict` в браузере обычным GET-запросом.
+
+Для предсказания используйте Swagger:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+или отправляйте POST-запрос.
+
 ### `No module named uvicorn`
 
-Установите `uvicorn`:
+Установите зависимости:
+
+```bash
+pip install -r requirements.txt
+```
+
+или отдельно:
 
 ```bash
 pip install uvicorn fastapi
 ```
 
-Запускать лучше так:
-
-```bash
-python -m uvicorn app.main:app --reload
-```
-
 ### `Can't get attribute ... sklearn`
 
-Версии `scikit-learn` в ноутбуке и в окружении API не совпадают.
+Версия `scikit-learn` в окружении не совпадает с версией, в которой сохранена модель.
 
-Проверьте версию в Jupyter:
+Для проекта нужна версия:
 
-```python
-import sklearn
-print(sklearn.__version__)
-```
-
-Проверьте версию в терминале:
-
-```bash
-python -c "import sklearn; print(sklearn.__version__)"
-```
-
-Установите нужную версию:
-
-```bash
-pip install scikit-learn==1.6.1 --force-reinstall
+```text
+1.8.0
 ```
 
 ### `CSV-файл не найден`
@@ -303,14 +363,9 @@ pip install scikit-learn==1.6.1 --force-reinstall
 
 ---
 
-## Основные классы
-
-`DataProcessor` — подготовка данных: переименование колонок, обработка `gender`, удаление технических колонок.
-
-`HeartAttackPredictor` — загрузка модели, чтение CSV, предобработка, предсказание и возврат результата.
-
----
-
 ## Автор
-Sergey Kiselev (sandyclawz@gmail.com).
+
+Sergey Kiselev  
+sandyclawz@gmail.com
+
 Проект выполнен в рамках учебного проекта по машинному обучению на Яндекс.Практикум.
